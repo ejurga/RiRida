@@ -54,8 +54,8 @@ sequence retrieval of a single IRIDA sample:
 
 ```{r}
 req_irida_sequences(sample_id = 12, type = "all") |> # Helper function
-    req_perform() |> 
-    resp_body_json() # httr2 functions for API interaction
+    httr2::req_perform() |> 
+    httr2::resp_body_json() # httr2 functions for API interaction
 ```
 
 Here, the details of accessing the IRIDA api are wrapped into
