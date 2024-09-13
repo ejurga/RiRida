@@ -1,11 +1,10 @@
 Package: RiRida
-Type: Package
-Title: What the Package Does (Title Case)
-Version: 0.1.0
-Author: Who wrote it
-Maintainer: The package maintainer <yourself@somewhere.net>
-Description: More about what it does (maybe more than one line)
-    Use four spaces when indenting paragraphs within the Description.
-License: What license is it under?
+Title: R-interface for the IRIDA API
+Version: 0.1
+Authors@R: 
+    person("Emil", "Jurga", , "emil.jurga@phac-aspc.gc.ca", role = c("aut", "cre"))
+Description: A suite of tools to interface with the IRIDA API
+License: 
 Encoding: UTF-8
-LazyData: true
+Roxygen: list(markdown = TRUE)
+RoxygenNote: 7.3.2
