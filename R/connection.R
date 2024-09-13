@@ -1,6 +1,3 @@
-require(httr2)
-require(tidyverse)
-
 options(RiRida.config_path = "./config.yml")
 
 #' Base irida API link with authentication
