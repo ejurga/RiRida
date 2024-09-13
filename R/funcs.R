@@ -1,63 +1,97 @@
-require(httr2)
-require(tidyverse)
-
-#' Base irida API link with authentication
+#' Get sequences associated with a list of IRIDA samples
 #'
-req_irida <- function(){
-  request(irida_api_link()) %>%
-  irida_oauth()
+#' Use this function to get a table of sequences associated with the
+#' supplied IRIDA sample IDs. This function does two API calls per
+#' sample, the first to get ALL sequences, and the second to get more
+#' information on paired sequences. The returned dataframe contains
+#' one record per unique sequence.
+#'
+#' @param samples A list of IRIDA sample IDs
+#' @param n_con How many connections to send to IRIDA in parralel?
+#'
+#' @return dataframe of sequences associated with each IRIDA sample
+#'
+#' @export
+get_all_sequence_info <- function(samples, n_con = 10){
+
+  # Get all sequences
+  resps <- req_sequences_parallel(samples = samples, type = "all", n_con)
+  all_seqs <- format_sequence_resp_to_df(resps)
+  # Get pairs of sequences
+  resps <- req_sequences_parallel(samples = samples, type = "pairs", n_con)
+  all_pairs <- format_pair_resp_to_df(resps)
+  # Filter out sequences fouund in the pairs call
+  df <- bind_rows(all_pairs, filter(all_seqs, !id %in% all_pairs$id))
+  return(df)
+
 }
 
-#' Base link for IRIDA API
+#' Request the sequence information for a list of samples in parallel
 #'
-irida_api_link <- function(){
-  "http://ngs-archive.corefacility.ca/irida/api"
+#' Sends requests for sequence information in parallel.
+#'
+#' @param samples A vector of IRIDA sample IDs to retrieve information for
+#' @param type "all" to retrieve entire sequence collection, "pairs" to
+#'    retrieve only information on pairs
+#' @param n_con Number of connections to send to IRIDA at once.
+#'
+#' @returns A list of httr2 responses
+#'
+req_sequences_parallel <- function(samples, type = c("all", "pairs"), n_con=10){
+
+  type <- match.arg(type)
+  pool <- curl::new_pool(total_con = n_con)
+  resps <-
+    lapply(req_irida_sequences, X = samples, type = type) |>
+    req_perform_parallel(on_error = "continue",  pool = pool,
+                         progress = paste("Retrieving Seqs:", type))
+  n_fail <- length(resps_failures(resps))
+  if ( n_fail>0 ){  warning("Failures: ", n_fail)
+  } else { message("All successful") }
+
+  return(resps)
 }
 
-#' Send authentication token using password method
+#' Format output from retrieval of sequences
 #'
-irida_oauth <- function(req){
-  req_oauth_password(req, client = irida_client(), username = "ejurga")
-}
-
-#' Access irida client
+#' @param resps A list of responses from an IRIDA API call
 #'
-irida_client <- function(){
-  oauth_client(
-    id = "api-ejurga",
-    secret = "QKYj7NISXV9KuAbDk4cnzXAiOfzn62AOJGWp8riMUV",
-    token_url = paste0(irida_api_link(), "/oauth/token"),
-    name = "irida-api")
-}
-
-#' Retrieve sequences related to an IRIDA sample ID
-#'
-#' @param sample_id IRIDA sample ID
-#' @param type If all, get all sequences, if pairs, get only paired end reads
-req_irida_sequences <- function(sample_id, type = c('all', 'pairs')){
-  type = match.arg(type)
-  if (type == "all") type <- "sequenceFiles"
-  req <-
-    req_irida() %>%
-    req_url_path_append("samples") %>%
-    req_url_path_append(sample_id) %>%
-    req_url_path_append(type)
-  return(req)
-}
-
-#' Format json from retrieval of paired end sequences
-format_pairs_json_to_df <- function(jsons){
+#' @export
+format_sequence_resp_to_df <- function(resps){
 
   l <- list()
-  for (i in seq(length(jsons))){
-    json <- jsons[[i]]
+  for (i in seq(length(resps))){
+    resp <- resps[[i]]
+    x <- resp_body_json(resp)
+    seqs <- x$resource$resources
+    l[[i]] <-
+      tibble(sampleID = get_sample_id_from_api_call(resp$url),
+                   id = sapply(seqs, function(seq) seq$identifier),
+             fileLink = sapply(seqs, function(seq) seq$file),
+             fileName = sapply(seqs, function(seq) seq$fileName))
+  }
 
-    x <- resp_body_json(json)
+  df <- bind_rows(l)
+  return(df)
+}
+
+#' Format response from retrieval of paired end sequences
+#'
+#' @param resps A list of responses from an IRIDA API call
+#'
+#' @export
+format_pair_resp_to_df <- function(resps){
+
+  l <- list()
+  for (i in seq(length(resps))){
+    resp <- resps[[i]]
+
+    x <- resp_body_json(resp)
     pairs <- x$resource$resources
 
     l[[i]] <-
       tibble(
-                sampleID = sample_id,
+                sampleID = get_sample_id_from_api_call(resp$url),
                   pairId = sapply(pairs, function(pair) pair$identifier),
               forward_id = sapply(pairs, function(pair) pair$forwardSequenceFile$identifier),
         forward_fileLink = sapply(pairs, function(pair) pair$forwardSequenceFile$file),
@@ -75,95 +109,24 @@ format_pairs_json_to_df <- function(jsons){
   return(df)
 }
 
-#' Format output from retrieval of sequences
-format_sequences_json_to_df <- function(json){
-
-  l <- list()
-  for (i in seq(length(jsons))){
-    json <- jsons[[i]]
-    x <- resp_body_json(json)
-    seqs <- x$resource$resources
-
-    l[[i]] <-
-      tibble(sampleID = sample_id,
-                   id = sapply(seqs, function(seq) seq$identifier),
-             fileLink = sapply(seqs, function(seq) seq$file),
-             fileName = sapply(seqs, function(seq) seq$fileName))
-  }
-
-  df <- bind_rows(l)
-  return(df)
+#' Get sample ID from the URL of an API call
+get_sample_id_from_api_call <- function(url){
+  sub(x = url, ".+samples/([0-9]+)/.+", "\\1")
 }
 
-#' Get dataframe of all sequences associated with an irida sample
+#' Retrieve sequences related to an IRIDA sample ID
 #'
-#' @param sample_id IRIDA sample identifier
+#' @param sample_id IRIDA sample ID
+#' @param type If all, get all sequences, if pairs, get only paired end reads
 #'
-#' @return A dataframe, in which each row is a sequence file associated with
-#'         the sample.
-#'
-get_sequences <- function(sample_id){
-  pairs <-
-    req_irida_sequences(sample_id, "pairs") %>%
-    req_perform() %>%
-    resp_body_json() %>%
-    format_pairs_json_to_df()
-
-  all_seqs <-
-    req_irida_sequences(sample_id, "all") %>%
-    req_perform() %>%
-    resp_body_json() %>%
-    format_sequences_json_to_df()
-
-  seqs_df <- bind_rows(pairs, filter(all_seqs, !id %in% pairs$id))
-  return(seqs_df)
-}
-
-#' Get sample information from all samples in an irida project
-#'
-#' @param project_id The IRIDA project ID
-#'
-#' @return A dataframe with all the samples in a project, along with some
-#'         of the metadata fields I expect to always be filled.
-project_samples <- function(project_id){
-
-  samples <-
+#' @export
+req_irida_sequences <- function(sample_id, type = c('all', 'pairs')){
+  type = match.arg(type)
+  if (type == "all") type <- "sequenceFiles"
+  req <-
     req_irida() %>%
-    req_url_path_append("projects") %>%
-    req_url_path_append(project_id) %>%
     req_url_path_append("samples") %>%
-    req_perform() %>%
-    resp_body_json()
-
-  x <- samples$resource$resources
-
-  df <-
-    tibble(
-              id = sapply(x, function(x) x$identifier),
-     sample_name = sapply(x, function(x) x$sampleName),
-     createdDate = as_datetime(sapply(x, function(x) x$createdDate/1000)),
-    modifiedDate = as_datetime(sapply(x, function(x) x$modifiedDate/1000)),
-     description = sapply(x, function(x) x$description)
-    )
-
-  return(df)
+    req_url_path_append(sample_id) %>%
+    req_url_path_append(type)
+  return(req)
 }
-
-ecoli_seqs <-
-  lapply(X = ecoli_samples$id[1:100], FUN = get_sequences) %>%
-  bind_rows()
-
-req_all_pairs <- lapply(req_irida_sequences, X = ecoli_seqs$sampleID[1:20], type = "pairs")
-
-resps <-
-  req_all_pairs %>%
-  req_perform_parallel(on_error = "continue")
-
-format_pairs_json_to_df(jsons = resps)
-
-bind_rows(lapply(resps, format_pairs_json_to_df))
-
-
-
-
-
