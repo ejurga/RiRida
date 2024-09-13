@@ -1,6 +1,8 @@
 require(httr2)
 require(tidyverse)
 
+options(RiRida.config_path = "./config.yml")
+
 #' Base irida API link with authentication
 #'
 req_irida <- function(){
@@ -17,15 +19,20 @@ irida_api_link <- function(){
 #' Send authentication token using password method
 #'
 irida_oauth <- function(req){
-  req_oauth_password(req, client = irida_client(), username = "ejurga")
+  req_oauth_password(req,
+                     client = irida_client(),
+                     username = config::get("irida-user",
+                                            file = getOption("RiRida.config_path")))
 }
 
 #' Access irida client
 #'
 irida_client <- function(){
   oauth_client(
-    id = "api-ejurga",
-    secret = "QKYj7NISXV9KuAbDk4cnzXAiOfzn62AOJGWp8riMUV",
+    id = config::get("irida-api-client",
+                     file = getOption("RiRida.config_path")),
+    secret = config::get("irida-api-secret",
+                         file = getOption("RiRida.config_path")),
     token_url = paste0(irida_api_link(), "/oauth/token"),
     name = "irida-api")
 }
