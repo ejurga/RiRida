@@ -11,7 +11,7 @@ project_samples(project_id)
 }
 \value{
 A dataframe with all the samples in a project, along with some
-        of the metadata fields I expect to always be filled.
+of the metadata fields I expect to always be filled.
 }
 \description{
 Get sample information from all samples in an irida project
