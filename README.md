@@ -60,7 +60,7 @@ req_irida_sequences(sample_id = 12, type = "all") |> # Helper function
 
 Here, the details of accessing the IRIDA api are wrapped into
 `req_irida_sequences()`. Using `type = "all"` requests a list of all sequences
-associated with the sample, while `type = "pairs` requests only paired end
+associated with the sample, while `type = "pairs"` requests only paired end
 sequences. The rest of the API call and retrieval can be handled by the user
 using `httr2` functions. 
 
