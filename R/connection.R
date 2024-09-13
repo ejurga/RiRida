@@ -13,7 +13,7 @@ req_irida <- function(){
 #' Base link for IRIDA API
 #'
 irida_api_link <- function(){
-  "http://ngs-archive.corefacility.ca/irida/api"
+  config::get("irida-api-url", file = getOption("RiRida.config_path"))
 }
 
 #' Send authentication token using password method

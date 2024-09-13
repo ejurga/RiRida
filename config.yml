@@ -1,4 +1,5 @@
 default:
+  irida-api-url:
   irida-user: 
   irida-api-client: 
   irida-api-secret: 
