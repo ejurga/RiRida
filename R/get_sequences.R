@@ -37,6 +37,7 @@ get_all_sequence_info <- function(samples, n_con = 10){
 #'
 #' @returns A list of httr2 responses
 #'
+#' @export
 req_sequences_parallel <- function(samples, type = c("all", "pairs"), n_con=10){
 
   type <- match.arg(type)
@@ -48,7 +49,7 @@ req_sequences_parallel <- function(samples, type = c("all", "pairs"), n_con=10){
   n_fail <- length(resps_failures(resps))
   if ( n_fail>0 ){  warning("Failures: ", n_fail)
   } else { message("All successful") }
-
+  names(resps) <- samples
   return(resps)
 }
 
@@ -129,4 +130,22 @@ req_irida_sequences <- function(sample_id, type = c('all', 'pairs')){
     req_url_path_append(sample_id) %>%
     req_url_path_append(type)
   return(req)
+}
+
+#' Attempts to format IRIDA api responses to a single dataframe
+#'
+#' @param resps A list of responses, ideally named
+#'
+#' @export
+resp_irida_to_dataframe <- function(resps){
+
+  strings <- lapply(resps, resp_body_string)
+
+  df <-
+    lapply(strings, jsonlite::fromJSON) |>
+    lapply(function(x) x$resource$resources) |>
+    bind_rows(.id = "id") |>
+    as_tibble()
+  return(df)
+
 }
