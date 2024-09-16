@@ -1,4 +1,4 @@
-#' Get sequences associated with a list of IRIDA samples
+  #' Get sequences associated with a list of IRIDA samples
 #'
 #' Use this function to get a table of sequences associated with the
 #' supplied IRIDA sample IDs. This function does two API calls per
@@ -20,8 +20,8 @@ get_all_sequence_info <- function(samples, n_con = 10){
   # Get pairs of sequences
   resps <- req_sequences_parallel(samples = samples, type = "pairs", n_con)
   all_pairs <- format_pair_resp_to_df(resps)
-  # Filter out sequences fouund in the pairs call
-  df <- bind_rows(all_pairs, filter(all_seqs, !id %in% all_pairs$id))
+  # Filter out sequences found in the pairs call
+  df <- dplyr::bind_rows(all_pairs, filter(all_seqs, !id %in% all_pairs$id))
   return(df)
 
 }
@@ -44,7 +44,7 @@ req_sequences_parallel <- function(samples, type = c("all", "pairs"), n_con=10){
   pool <- curl::new_pool(total_con = n_con)
   resps <-
     lapply(req_irida_sequences, X = samples, type = type) |>
-    req_perform_parallel(on_error = "continue",  pool = pool,
+    httr2::req_perform_parallel(on_error = "continue",  pool = pool,
                          progress = paste("Retrieving Seqs:", type))
   n_fail <- length(resps_failures(resps))
   if ( n_fail>0 ){  warning("Failures: ", n_fail)
@@ -57,22 +57,24 @@ req_sequences_parallel <- function(samples, type = c("all", "pairs"), n_con=10){
 #'
 #' @param resps A list of responses from an IRIDA API call
 #'
+#' @importFrom tibble tibble
 #' @export
 format_sequence_resp_to_df <- function(resps){
 
   l <- list()
   for (i in seq(length(resps))){
     resp <- resps[[i]]
-    x <- resp_body_json(resp)
+    x <- httr2::resp_body_json(resp)
     seqs <- x$resource$resources
     l[[i]] <-
       tibble(sampleID = get_sample_id_from_api_call(resp$url),
                    id = sapply(seqs, function(seq) seq$identifier),
              fileLink = sapply(seqs, function(seq) seq$file),
-             fileName = sapply(seqs, function(seq) seq$fileName))
+             fileName = sapply(seqs, function(seq) seq$fileName),
+               Sha256 = sapply(seqs, function(seq) seq$uploadSha256))
   }
 
-  df <- bind_rows(l)
+  df <- dplyr::bind_rows(l)
   return(df)
 }
 
@@ -80,6 +82,7 @@ format_sequence_resp_to_df <- function(resps){
 #'
 #' @param resps A list of responses from an IRIDA API call
 #'
+#' @importFrom tibble tibble
 #' @export
 format_pair_resp_to_df <- function(resps){
 
@@ -87,7 +90,7 @@ format_pair_resp_to_df <- function(resps){
   for (i in seq(length(resps))){
     resp <- resps[[i]]
 
-    x <- resp_body_json(resp)
+    x <- httr2::resp_body_json(resp)
     pairs <- x$resource$resources
 
     l[[i]] <-
@@ -97,15 +100,17 @@ format_pair_resp_to_df <- function(resps){
               forward_id = sapply(pairs, function(pair) pair$forwardSequenceFile$identifier),
         forward_fileLink = sapply(pairs, function(pair) pair$forwardSequenceFile$file),
         forward_fileName = sapply(pairs, function(pair) pair$forwardSequenceFile$fileName),
+          forward_Sha256 = sapply(pairs, function(pair) pair$forwardSequenceFile$uploadSha256),
               reverse_id = sapply(pairs, function(pair) pair$reverseSequenceFile$identifier),
         reverse_fileLink = sapply(pairs, function(pair) pair$reverseSequenceFile$file),
-        reverse_fileName = sapply(pairs, function(pair) pair$reverseSequenceFile$fileName)
-      ) %>%
+        reverse_fileName = sapply(pairs, function(pair) pair$reverseSequenceFile$fileName),
+          reverse_Sha256 = sapply(pairs, function(pair) pair$reverseSequenceFile$uploadSha256)
+      ) |>
         pivot_longer(cols = matches(c("forward", "reverse")),
                      names_to = c("direction", ".value"),
                      names_sep = "_")
   }
-  df <- bind_rows(l)
+  df <- dplyr::bind_rows(l)
 
   return(df)
 }
@@ -120,6 +125,7 @@ get_sample_id_from_api_call <- function(url){
 #' @param sample_id IRIDA sample ID
 #' @param type If all, get all sequences, if pairs, get only paired end reads
 #'
+#' @importFrom httr2 req_url_path_append
 #' @export
 req_irida_sequences <- function(sample_id, type = c('all', 'pairs')){
   type = match.arg(type)
@@ -136,6 +142,7 @@ req_irida_sequences <- function(sample_id, type = c('all', 'pairs')){
 #'
 #' @param resps A list of responses, ideally named
 #'
+#' @importFrom tibble tibble
 #' @export
 resp_irida_to_dataframe <- function(resps){
 
@@ -144,7 +151,7 @@ resp_irida_to_dataframe <- function(resps){
   df <-
     lapply(strings, jsonlite::fromJSON) |>
     lapply(function(x) x$resource$resources) |>
-    bind_rows(.id = "id") |>
+    dplyr::bind_rows(.id = "id") |>
     as_tibble()
   return(df)
 

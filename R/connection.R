@@ -7,7 +7,7 @@
 #' Base irida API link with authentication
 #'
 req_irida <- function(){
-  request(irida_api_link()) %>%
+  httr2::request(irida_api_link()) |>
   irida_oauth()
 }
 
@@ -20,16 +20,16 @@ irida_api_link <- function(){
 #' Send authentication token using password method
 #'
 irida_oauth <- function(req){
-  req_oauth_password(req,
-                     client = irida_client(),
-                     username = config::get("irida-user",
-                                            file = getOption("RiRida.config_path")))
+  httr2::req_oauth_password(req,
+                            client = irida_client(),
+                            username = config::get("irida-user",
+                                                   file = getOption("RiRida.config_path")))
 }
 
 #' Access irida client
 #'
 irida_client <- function(){
-  oauth_client(
+  httr2::oauth_client(
     id = config::get("irida-api-client",
                      file = getOption("RiRida.config_path")),
     secret = config::get("irida-api-secret",
