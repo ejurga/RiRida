@@ -15,19 +15,9 @@ project_samples <- function(project_id){
     req_url_path_append("projects") |>
     req_url_path_append(project_id) |>
     req_url_path_append("samples") |>
-    req_perform() |>
-    resp_body_json()
+    req_perform()
 
-  x <- samples$resource$resources
-
-  df <-
-    tibble(
-              id = sapply(x, function(x) x$identifier),
-     sample_name = sapply(x, function(x) x$sampleName),
-     createdDate = as_datetime(sapply(x, function(x) x$createdDate/1000)),
-    modifiedDate = as_datetime(sapply(x, function(x) x$modifiedDate/1000)),
-     description = sapply(x, function(x) x$description)
-    )
+  df <- resp_irida_to_dataframe(list(samples))
 
   return(df)
 }
