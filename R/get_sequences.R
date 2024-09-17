@@ -1,4 +1,4 @@
-  #' Get sequences associated with a list of IRIDA samples
+#' Get sequences associated with a list of IRIDA samples
 #'
 #' Use this function to get a table of sequences associated with the
 #' supplied IRIDA sample IDs. This function does two API calls per
@@ -11,17 +11,19 @@
 #'
 #' @return dataframe of sequences associated with each IRIDA sample
 #'
+#' @import dplyr
 #' @export
 get_all_sequence_info <- function(samples, n_con = 10){
 
   # Get all sequences
   resps <- req_sequences_parallel(samples = samples, type = "all", n_con)
-  all_seqs <- format_sequence_resp_to_df(resps)
+  all_seqs <- resp_irida_to_dataframe(resps)
   # Get pairs of sequences
   resps <- req_sequences_parallel(samples = samples, type = "pairs", n_con)
-  all_pairs <- format_pair_resp_to_df(resps)
+  all_pairs <- pair_resps_to_df(resps = resps)
   # Filter out sequences found in the pairs call
-  df <- dplyr::bind_rows(all_pairs, filter(all_seqs, !id %in% all_pairs$id))
+  df <- bind_rows(all_pairs,
+                  filter(all_seqs, !id %in% all_pairs$id))
   return(df)
 
 }
@@ -51,68 +53,6 @@ req_sequences_parallel <- function(samples, type = c("all", "pairs"), n_con=10){
   } else { message("All successful") }
   names(resps) <- samples
   return(resps)
-}
-
-#' Format output from retrieval of sequences
-#'
-#' @param resps A list of responses from an IRIDA API call
-#'
-#' @importFrom tibble tibble
-#' @export
-format_sequence_resp_to_df <- function(resps){
-
-  l <- list()
-  for (i in seq(length(resps))){
-    resp <- resps[[i]]
-    x <- httr2::resp_body_json(resp)
-    seqs <- x$resource$resources
-    l[[i]] <-
-      tibble(sampleID = get_sample_id_from_api_call(resp$url),
-                   id = sapply(seqs, function(seq) seq$identifier),
-             fileLink = sapply(seqs, function(seq) seq$file),
-             fileName = sapply(seqs, function(seq) seq$fileName),
-               Sha256 = sapply(seqs, function(seq) seq$uploadSha256))
-  }
-
-  df <- dplyr::bind_rows(l)
-  return(df)
-}
-
-#' Format response from retrieval of paired end sequences
-#'
-#' @param resps A list of responses from an IRIDA API call
-#'
-#' @importFrom tibble tibble
-#' @export
-format_pair_resp_to_df <- function(resps){
-
-  l <- list()
-  for (i in seq(length(resps))){
-    resp <- resps[[i]]
-
-    x <- httr2::resp_body_json(resp)
-    pairs <- x$resource$resources
-
-    l[[i]] <-
-      tibble(
-                sampleID = get_sample_id_from_api_call(resp$url),
-                  pairId = sapply(pairs, function(pair) pair$identifier),
-              forward_id = sapply(pairs, function(pair) pair$forwardSequenceFile$identifier),
-        forward_fileLink = sapply(pairs, function(pair) pair$forwardSequenceFile$file),
-        forward_fileName = sapply(pairs, function(pair) pair$forwardSequenceFile$fileName),
-          forward_Sha256 = sapply(pairs, function(pair) pair$forwardSequenceFile$uploadSha256),
-              reverse_id = sapply(pairs, function(pair) pair$reverseSequenceFile$identifier),
-        reverse_fileLink = sapply(pairs, function(pair) pair$reverseSequenceFile$file),
-        reverse_fileName = sapply(pairs, function(pair) pair$reverseSequenceFile$fileName),
-          reverse_Sha256 = sapply(pairs, function(pair) pair$reverseSequenceFile$uploadSha256)
-      ) |>
-        pivot_longer(cols = matches(c("forward", "reverse")),
-                     names_to = c("direction", ".value"),
-                     names_sep = "_")
-  }
-  df <- dplyr::bind_rows(l)
-
-  return(df)
 }
 
 #' Get sample ID from the URL of an API call
@@ -155,4 +95,33 @@ resp_irida_to_dataframe <- function(resps){
     as_tibble()
   return(df)
 
+}
+
+#' Convert a list of IRIDA API responses for sequence pairs into a dataframe
+#'
+#' @param resps description
+#'
+pair_resps_to_df <- function(resps){
+  df <-
+    lapply(resps, httr2::resp_body_json) |>
+    lapply(function(x) x$resource$resources) |>
+    lapply(get_forward_and_reverse_files_as_df) |>
+    dplyr::bind_rows(.id = "id")
+  return(df)
+}
+
+#' Retrieve the forward and reverse sequencing file information
+#'
+get_forward_and_reverse_files_as_df <- function(x){
+  l <- list()
+  for (i in seq(length(x))){
+    f <- x[[i]]$forwardSequenceFile
+    f$direction = "forward"
+    r <- x[[i]]$reverseSequenceFile
+    r$direction = "reverse"
+    l[[i]] <- bind_rows(f, r)
+    l[[i]]$pair_id = x[[i]]$identifier
+  }
+  df <- dplyr::bind_rows(l)
+  return(df)
 }
