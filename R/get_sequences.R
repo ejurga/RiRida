@@ -22,10 +22,19 @@ get_all_sequence_info <- function(samples, n_con = 10){
   resps <- req_sequences_parallel(samples = samples, type = "pairs", n_con)
   all_pairs <- pair_resps_to_df(resps = resps)
   # Filter out sequences found in the pairs call
-  df <- bind_rows(all_pairs,
-                  filter(all_seqs, !id %in% all_pairs$id))
-  return(df)
+  df <-
+    bind_rows(all_pairs,
+              filter(all_seqs, !id %in% all_pairs$id)) |>
+    mutate(across(contains("Date"), ~irida_timecode_to_datetime(.x)))
 
+  return(df)
+}
+
+#' Convert IRIDA timestamps into a datetime
+#'
+irida_timecode_to_datetime <- function(x){
+  res <- lubridate::as_datetime(x/1000)
+  return(res)
 }
 
 #' Request the sequence information for a list of samples in parallel
