@@ -22,11 +22,7 @@ get_all_sequence_info <- function(samples, n_con = 10){
   resps <- req_sequences_parallel(samples = samples, type = "pairs", n_con)
   all_pairs <- pair_resps_to_df(resps = resps)
   # Filter out sequences found in the pairs call
-  df <-
-    bind_rows(all_pairs,
-              filter(all_seqs, !id %in% all_pairs$id)) |>
-    mutate(across(contains("Date"), ~irida_timecode_to_datetime(.x)))
-
+  df <- bind_rows(all_pairs, filter(all_seqs, !id %in% all_pairs$id))
   return(df)
 }
 
@@ -95,15 +91,24 @@ req_irida_sequences <- function(sample_id, type = c('all', 'pairs')){
 #' @export
 resp_irida_to_dataframe <- function(resps){
 
-  strings <- lapply(resps, resp_body_string)
+  strings <- lapply(resps, httr2::resp_body_string)
 
   df <-
     lapply(strings, jsonlite::fromJSON) |>
     lapply(function(x) x$resource$resources) |>
-    dplyr::bind_rows(.id = "id") |>
-    as_tibble()
-  return(df)
+    dplyr::bind_rows(.id = "id")
 
+  if (nrow(df)==0) {
+    warning("Attempting to coerce to dataframe, but response appears to be empty")
+    return(NULL)
+  } else {
+    df <-
+      df |>
+      dplyr::mutate(across(contains("Date"), ~irida_timecode_to_datetime(.x))) |>
+      dplyr::select(identifier, everything()) |>
+      as_tibble()
+    return(df)
+  }
 }
 
 #' Convert a list of IRIDA API responses for sequence pairs into a dataframe
@@ -115,7 +120,8 @@ pair_resps_to_df <- function(resps){
     lapply(resps, httr2::resp_body_json) |>
     lapply(function(x) x$resource$resources) |>
     lapply(get_forward_and_reverse_files_as_df) |>
-    dplyr::bind_rows(.id = "id")
+    dplyr::bind_rows(.id = "id") |>
+    dplyr::mutate(across(contains("Date"), ~irida_timecode_to_datetime(.x)))
   return(df)
 }
 
