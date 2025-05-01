@@ -2,6 +2,7 @@
 
 export(.onLoad)
 export(get_all_sequence_info)
+export(get_projects)
 export(project_samples)
 export(req_irida_sequences)
 export(req_sequences_parallel)
