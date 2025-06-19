@@ -7,22 +7,31 @@
 #' one record per unique sequence.
 #'
 #' @param samples A list of IRIDA sample IDs
-#' @param n_con How many connections to send to IRIDA in parralel?
+#' @param type all: Retreive all sequence information, pairs: retrieve only paired-read sequences
+#' @param n_con Number of connections to send to IRIDA at once.
+#' @param throttle_capacity From [httr2::req_throttle]: Set this to limit the number of requests per set fill_time
+#' @param fill_time From [httr2::req_throttle]: how much time to fill capacity
 #'
 #' @return dataframe of sequences associated with each IRIDA sample
 #'
 #' @import dplyr
 #' @export
-get_all_sequence_info <- function(samples, n_con = 10){
+get_sequences <- function(samples,
+                          n_con = 10,
+                           type = c("all", "pairs"),
+              throttle_capacity = 100,
+                      fill_time = 10){
+  type <- match.arg(type)
 
+  resps <- req_sequences_parallel(samples = samples,
+                                     type = type,
+                                    n_con = n_con,
+                        throttle_capacity = throttle_capacity,
+                                fill_time = fill_time)
   # Get all sequences
-  resps <- req_sequences_parallel(samples = samples, type = "all", n_con)
-  all_seqs <- resp_irida_to_dataframe(resps)
-  # Get pairs of sequences
-  resps <- req_sequences_parallel(samples = samples, type = "pairs", n_con)
-  all_pairs <- pair_resps_to_df(resps = resps)
-  # Filter out sequences found in the pairs call
-  df <- bind_rows(all_pairs, filter(all_seqs, !id %in% all_pairs$id))
+  if (type == "all"){            df <- resp_irida_to_dataframe(resps)
+  } else if (type == "pairs") {  df <- pair_resps_to_df(resps)
+  } else {stop()}
   return(df)
 }
 
@@ -40,22 +49,25 @@ irida_timecode_to_datetime <- function(x){
 #' @param samples A vector of IRIDA sample IDs to retrieve information for
 #' @param type "all" to retrieve entire sequence collection, "pairs" to
 #'    retrieve only information on pairs
-#' @param n_con Number of connections to send to IRIDA at once.
-#'
+#' @inheritParams get_sequences
 #' @returns A list of httr2 responses
 #'
 #' @export
-req_sequences_parallel <- function(samples, type = c("all", "pairs"), n_con=10){
+req_sequences_parallel <- function(samples, type = c("all", "pairs"), n_con=10, throttle_capacity = 100, fill_time = 10){
 
   type <- match.arg(type)
-  pool <- curl::new_pool(total_con = n_con)
-  resps <-
-    lapply(req_irida_sequences, X = samples, type = type) |>
-    httr2::req_perform_parallel(on_error = "continue",  pool = pool,
-                         progress = paste("Retrieving Seqs:", type))
+  seq_req <- lapply(req_irida_sequences, X = samples, type = type)
+  throttle_reqs <- lapply(FUN = req_throttle, X = seq_req,
+                          capacity = throttle_capacity, fill_time_s = fill_time)
+  resps <- httr2::req_perform_parallel(reqs = throttle_reqs,
+                                       on_error = "continue",
+                                       max_active = n_con,
+                                       progress = TRUE)
+
+  # Check for failures
   n_fail <- length(resps_failures(resps))
-  if ( n_fail>0 ){  warning("Failures: ", n_fail)
-  } else { message("All successful") }
+  if ( n_fail>0 ){ warning("Failures: ", n_fail) } else { message("All successful") }
+  # Set names
   names(resps) <- samples
   return(resps)
 }
@@ -76,9 +88,9 @@ req_irida_sequences <- function(sample_id, type = c('all', 'pairs')){
   type = match.arg(type)
   if (type == "all") type <- "sequenceFiles"
   req <-
-    req_irida() %>%
-    req_url_path_append("samples") %>%
-    req_url_path_append(sample_id) %>%
+    req_irida() |>
+    req_url_path_append("samples") |>
+    req_url_path_append(sample_id) |>
     req_url_path_append(type)
   return(req)
 }

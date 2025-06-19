@@ -4,7 +4,13 @@
 \alias{req_sequences_parallel}
 \title{Request the sequence information for a list of samples in parallel}
 \usage{
-req_sequences_parallel(samples, type = c("all", "pairs"), n_con = 10)
+req_sequences_parallel(
+  samples,
+  type = c("all", "pairs"),
+  n_con = 10,
+  throttle_capacity = 100,
+  fill_time = 10
+)
 }
 \arguments{
 \item{samples}{A vector of IRIDA sample IDs to retrieve information for}
@@ -13,6 +19,10 @@ req_sequences_parallel(samples, type = c("all", "pairs"), n_con = 10)
 retrieve only information on pairs}
 
 \item{n_con}{Number of connections to send to IRIDA at once.}
+
+\item{throttle_capacity}{From \link[httr2:req_throttle]{httr2::req_throttle}: Set this to limit the number of requests per set fill_time}
+
+\item{fill_time}{From \link[httr2:req_throttle]{httr2::req_throttle}: how much time to fill capacity}
 }
 \value{
 A list of httr2 responses
