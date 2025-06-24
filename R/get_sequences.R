@@ -28,6 +28,7 @@ get_sequences <- function(samples,
                                     n_con = n_con,
                         throttle_capacity = throttle_capacity,
                                 fill_time = fill_time)
+
   # Get all sequences
   if (type == "all"){            df <- resp_irida_to_dataframe(resps)
   } else if (type == "pairs") {  df <- pair_resps_to_df(resps)
@@ -63,13 +64,16 @@ req_sequences_parallel <- function(samples, type = c("all", "pairs"), n_con=10, 
                                        on_error = "continue",
                                        max_active = n_con,
                                        progress = TRUE)
+  names(resps) <- samples
 
   # Check for failures
-  n_fail <- length(resps_failures(resps))
-  if ( n_fail>0 ){ warning("Failures: ", n_fail) } else { message("All successful") }
-  # Set names
-  names(resps) <- samples
-  return(resps)
+  fails <- resps_failures(resps)
+  n_fail <- length(fails)
+  if ( n_fail>0 ){
+    warning("Failure to fetch for irida sample ids: ", paste0(names(fails), collapse = ", "))
+  } else { message("All successful") }
+
+  return(httr2::resps_successes(resps))
 }
 
 #' Get sample ID from the URL of an API call
@@ -128,27 +132,32 @@ resp_irida_to_dataframe <- function(resps){
 #' @param resps description
 #'
 pair_resps_to_df <- function(resps){
-  df <-
-    lapply(resps, httr2::resp_body_json) |>
-    lapply(function(x) x$resource$resources) |>
-    lapply(get_forward_and_reverse_files_as_df) |>
-    dplyr::bind_rows(.id = "id") |>
-    dplyr::mutate(across(contains("Date"), ~irida_timecode_to_datetime(.x)))
+    json <- lapply(resps, httr2::resp_body_json)
+    res <- lapply(FUN=function(x) x$resource$resources, X=json)
+    res_dfs <- lapply(FUN=get_forward_and_reverse_files_as_df, X=res)
+    df <-
+      dplyr::bind_rows(res_dfs, .id = "id") |>
+      dplyr::mutate(across(contains("Date"), ~irida_timecode_to_datetime(.x)))
   return(df)
 }
 
 #' Retrieve the forward and reverse sequencing file information
 #'
 get_forward_and_reverse_files_as_df <- function(x){
-  l <- list()
-  for (i in seq(length(x))){
-    f <- x[[i]]$forwardSequenceFile
-    f$direction = "forward"
-    r <- x[[i]]$reverseSequenceFile
-    r$direction = "reverse"
-    l[[i]] <- bind_rows(f, r)
-    l[[i]]$pair_id = x[[i]]$identifier
+  if (length(x)==0){
+    warning("No sequences found")
+    return(NULL)
+  } else {
+    l <- list()
+    for (i in seq(length(x))){
+      f <- x[[i]]$forwardSequenceFile
+      f$direction = "forward"
+      r <- x[[i]]$reverseSequenceFile
+      r$direction = "reverse"
+      l[[i]] <- bind_rows(f, r)
+      l[[i]]$pair_id = x[[i]]$identifier
+    }
+    df <- dplyr::bind_rows(l)
+    return(df)
   }
-  df <- dplyr::bind_rows(l)
-  return(df)
 }
