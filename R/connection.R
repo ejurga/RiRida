@@ -1,7 +1,9 @@
 #' Load options
 #' @export
 .onLoad <- function(libname, pkgname){
-  options(RiRida.config_path = "./config.yml")
+  if (is.null(getOption("RiRida.config_path"))){
+    options(RiRida.config_path = "./config.yml")
+  }
 }
 
 #' Base irida API link with authentication
