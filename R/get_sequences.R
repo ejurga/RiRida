@@ -31,7 +31,10 @@ get_sequences <- function(samples,
 
   # Get all sequences
   if (type == "all"){            df <- resp_irida_to_dataframe(resps)
-  } else if (type == "pairs") {  df <- pair_resps_to_df(resps)
+  } else if (type == "pairs") {
+    df <- pair_resps_to_df(resps) %>%
+          tidyr::pivot_wider(id_cols = c(id, pair_id), names_from = direction, values_from = c(-id, -pair_id)) %>%
+          rename(sample_id = id)
   } else {stop()}
   return(df)
 }
@@ -161,3 +164,9 @@ get_forward_and_reverse_files_as_df <- function(x){
     return(df)
   }
 }
+
+#' Format a pair datafram response into wide form
+
+
+
+
