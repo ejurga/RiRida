@@ -4,13 +4,14 @@
 #' supplied IRIDA sample IDs. This function does two API calls per
 #' sample, the first to get ALL sequences, and the second to get more
 #' information on paired sequences. The returned dataframe contains
-#' one record per unique sequence.
+#' one record per unique sequence. This function defaults to send no more
+#' then 100 requests per 60 seconds.
 #'
 #' @param samples A list of IRIDA sample IDs
 #' @param type all: Retreive all sequence information, pairs: retrieve only paired-read sequences
 #' @param n_con Number of connections to send to IRIDA at once.
 #' @param throttle_capacity From [httr2::req_throttle]: Set this to limit the number of requests per set fill_time
-#' @param fill_time From [httr2::req_throttle]: how much time to fill capacity
+#' @param fill_time From [httr2::req_throttle]: how much time to fill capacity.
 #'
 #' @return dataframe of sequences associated with each IRIDA sample
 #'
@@ -20,7 +21,7 @@ get_sequences <- function(samples,
                           n_con = 10,
                            type = c("all", "pairs"),
               throttle_capacity = 100,
-                      fill_time = 10){
+                      fill_time = 60){
   type <- match.arg(type)
 
   resps <- req_sequences_parallel(samples = samples,
@@ -30,7 +31,8 @@ get_sequences <- function(samples,
                                 fill_time = fill_time)
 
   # Get all sequences
-  if (type == "all"){            df <- resp_irida_to_dataframe(resps)
+  if (type == "all"){            
+    df <- resp_irida_to_dataframe(resps)
   } else if (type == "pairs") {
     df <- pair_resps_to_df(resps) %>%
           tidyr::pivot_wider(id_cols = c(id, pair_id), names_from = direction, values_from = c(-id, -pair_id)) %>%
@@ -163,10 +165,4 @@ get_forward_and_reverse_files_as_df <- function(x){
     df <- dplyr::bind_rows(l)
     return(df)
   }
-}
-
-#' Format a pair datafram response into wide form
-
-
-
-
+j}
