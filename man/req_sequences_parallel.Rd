@@ -22,7 +22,7 @@ retrieve only information on pairs}
 
 \item{throttle_capacity}{From \link[httr2:req_throttle]{httr2::req_throttle}: Set this to limit the number of requests per set fill_time}
 
-\item{fill_time}{From \link[httr2:req_throttle]{httr2::req_throttle}: how much time to fill capacity}
+\item{fill_time}{From \link[httr2:req_throttle]{httr2::req_throttle}: how much time to fill capacity.}
 }
 \value{
 A list of httr2 responses

@@ -9,7 +9,7 @@ get_sequences(
   n_con = 10,
   type = c("all", "pairs"),
   throttle_capacity = 100,
-  fill_time = 10
+  fill_time = 60
 )
 }
 \arguments{
@@ -21,7 +21,7 @@ get_sequences(
 
 \item{throttle_capacity}{From \link[httr2:req_throttle]{httr2::req_throttle}: Set this to limit the number of requests per set fill_time}
 
-\item{fill_time}{From \link[httr2:req_throttle]{httr2::req_throttle}: how much time to fill capacity}
+\item{fill_time}{From \link[httr2:req_throttle]{httr2::req_throttle}: how much time to fill capacity.}
 }
 \value{
 dataframe of sequences associated with each IRIDA sample
@@ -31,5 +31,6 @@ Use this function to get a table of sequences associated with the
 supplied IRIDA sample IDs. This function does two API calls per
 sample, the first to get ALL sequences, and the second to get more
 information on paired sequences. The returned dataframe contains
-one record per unique sequence.
+one record per unique sequence. This function defaults to send no more
+then 100 requests per 60 seconds.
 }
