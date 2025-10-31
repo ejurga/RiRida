@@ -41,11 +41,13 @@ To retrieve the sequences associated with a sample, supply a sample ID (or
 vector of sample IDs). Note that this function queries an IRIDA API in parallel 
 to speed up retrieval if you have a lot of samples to investigate. To limit (or 
 speed up) retrieval, set the `n_con` parameter to an appropriate number of 
-simultaneous connections. 
+simultaneous connections. Setting the `type` parameter to `pairs` will retrieve paired-end sequences only, 
+while `all` will retrieve every sequence associated with the samples. 
 
 ```{r}
-get_all_sequence_info(samples = c(1,2,3,4,5), n_con = 10)
+get_all_sequence_info(samples = c(1,2,3,4,5), type = "pairs", n_con = 10)
 ```
+
 
 This function formats the response from the API into a dataframe. In case you 
 want more fine control over e.g., the formatting of the response, you can 
