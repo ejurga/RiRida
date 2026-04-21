@@ -44,7 +44,7 @@ get_sequences <- function(samples,
 #' Convert IRIDA timestamps into a datetime
 #'
 irida_timecode_to_datetime <- function(x){
-  res <- lubridate::as_datetime(x/1000)
+  res <- lubridate::as_datetime(as.numeric(x)/1000)
   return(res)
 }
 
@@ -141,12 +141,12 @@ pair_resps_to_df <- function(resps){
     res <- lapply(FUN=function(x) x$resource$resources, X=json)
     dfs <- list()
     for (i in seq(length(res)) ){
-      dfs[[i]] <- get_forward_and_reverse_files_as_df(x = x)
+      dfs[[i]] <- get_forward_and_reverse_files_as_df(x = res[[i]])
     }
     names(dfs) <- names(res)
-    df <-
-      dplyr::bind_rows(dfs, .id = "id") |>
-      dplyr::mutate(across(contains("Date"), ~irida_timecode_to_datetime(.x)))
+    df <- dplyr::bind_rows(dfs, .id = "id")
+    df$modifiedDate <- irida_timecode_to_datetime(x = df$modifiedDate)
+    df$createdDate  <- irida_timecode_to_datetime(x = df$createdDate)
   return(df)
 }
 
@@ -163,7 +163,7 @@ get_forward_and_reverse_files_as_df <- function(x){
       f$direction = "forward"
       r <- x[[i]]$reverseSequenceFile
       r$direction = "reverse"
-      l[[i]] <- bind_rows(f, r)
+      l[[i]] <- as_tibble(rbind(unlist(f), unlist(r)))
       l[[i]]$pair_id = x[[i]]$identifier
     }
     df <- dplyr::bind_rows(l)
