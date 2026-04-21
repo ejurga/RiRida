@@ -31,14 +31,14 @@ get_sequences <- function(samples,
                                 fill_time = fill_time)
 
   # Get all sequences
-  if (type == "all"){            
+  if (type == "all"){
     df <- resp_irida_to_dataframe(resps)
   } else if (type == "pairs") {
-    df <- pair_resps_to_df(resps) %>%
-          tidyr::pivot_wider(id_cols = c(id, pair_id), names_from = direction, values_from = c(-id, -pair_id)) %>%
-          rename(sample_id = id)
+    df <- pair_resps_to_df(resps)
+    df_wide <- tidyr::pivot_wider(df, id_cols = c(id, pair_id), names_from = direction, values_from = c(-id, -pair_id))
+    df_wide <- rename(df_wide, sample_id = id)
   } else {stop()}
-  return(df)
+  return(df_wide)
 }
 
 #' Convert IRIDA timestamps into a datetime
@@ -139,9 +139,13 @@ resp_irida_to_dataframe <- function(resps){
 pair_resps_to_df <- function(resps){
     json <- lapply(resps, httr2::resp_body_json)
     res <- lapply(FUN=function(x) x$resource$resources, X=json)
-    res_dfs <- lapply(FUN=get_forward_and_reverse_files_as_df, X=res)
+    dfs <- list()
+    for (i in seq(length(res)) ){
+      dfs[[i]] <- get_forward_and_reverse_files_as_df(x = x)
+    }
+    names(dfs) <- names(res)
     df <-
-      dplyr::bind_rows(res_dfs, .id = "id") |>
+      dplyr::bind_rows(dfs, .id = "id") |>
       dplyr::mutate(across(contains("Date"), ~irida_timecode_to_datetime(.x)))
   return(df)
 }
@@ -165,4 +169,4 @@ get_forward_and_reverse_files_as_df <- function(x){
     df <- dplyr::bind_rows(l)
     return(df)
   }
-j}
+}
