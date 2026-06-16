@@ -32,13 +32,13 @@ get_sequences <- function(samples,
 
   # Get all sequences
   if (type == "all"){
-    df <- resp_irida_to_dataframe(resps)
+    df_res <- resp_irida_to_dataframe(resps)
   } else if (type == "pairs") {
     df <- pair_resps_to_df(resps)
     df_wide <- tidyr::pivot_wider(df, id_cols = c(id, pair_id), names_from = direction, values_from = c(-id, -pair_id))
-    df_wide <- rename(df_wide, sample_id = id)
+    df_res <- rename(df_wide, sample_id = id)
   } else {stop()}
-  return(df_wide)
+  return(df_res)
 }
 
 #' Convert IRIDA timestamps into a datetime
